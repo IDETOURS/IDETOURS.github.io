@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Reservas</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script> <!-- Librería para exportar a Excel -->
+</head>
+<body class="bg-slate-100 font-Barlow w-full min-w-[450px]">
+
+    <header>
+        <h1 class="bg-green-600 font-Fraunces p-6 text-white text-4xl font-bold w-full text-center">Historial de Reservas</h1>
+    </header>
+
+    <div class="container mx-auto mt-5">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold text-gray-800">Lista de Reservas</h2>
+
+            <!-- Buscador -->
+            <div class="mt-4">
+                <input type="text" id="searchInput" placeholder="Buscar por cliente o número de cupón..." class="w-full p-3 border border-gray-300 rounded-md" oninput="buscarReservas()">
+            </div>
+
+            <!-- Tabla de reservas -->
+            <div id="reservasContainer" class="mt-6">
+                <table class="min-w-full table-auto">
+                    <thead>
+                        <tr class="text-md">
+                            <th class="px-4 py-2 border-b">Número de Cupón</th>
+                            <th class="px-4 py-2 border-b">Cliente</th>
+                            <th class="px-4 py-2 border-b">Correo</th>
+                            <th class="px-4 py-2 border-b">Fecha</th>
+                            <th class="px-4 py-2 border-b">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reservasTableBody">
+                        <!-- Las reservas se llenarán aquí con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Botón para exportar a Excel -->
+            <div class="flex place-content-around">
+                <div class="mt-6">
+                    <!-- Icono para exportar a Excel -->
+                    <i class="material-icons cursor-pointer text-xl" onclick="exportarAExcel()">file_download</i>
+                </div>
+            
+                <!-- Icono para regresar al index -->
+                <div class="mt-6">
+                    <i class="material-icons cursor-pointer text-xl" onclick="window.location.href='dashboard.html'">home</i>
+                </div>
+            </div>
+            
+            
+        </div>
+    </div>
+
+    <script>
+        // Función para cargar las reservas desde localStorage
+        function cargarReservas() {
+            const reservas = JSON.parse(localStorage.getItem('historialReservas')) || [];
+            const reservasTableBody = document.getElementById('reservasTableBody');
+            const fechaLimite = new Date(new Date().setDate(new Date().getDate() - 15)); // 15 días atrás
+
+            // Filtrar las reservas que sean menores a 15 días
+            const reservasValidas = reservas.filter(reserva => {
+                const fechaPago = new Date(reserva.fechaPago);
+                return fechaPago >= fechaLimite;
+            });
+
+            // Si no hay reservas, mostrar un mensaje
+            if (reservasValidas.length === 0) {
+                reservasTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center p-4">No hay reservas recientes.</td>
+                    </tr>
+                `;
+            } else {
+                // Llenar la tabla con las reservas
+                reservasTableBody.innerHTML = reservasValidas.map(reserva => ` 
+                    <tr class="text-xs">
+                        <td class="px-4 py-2 border-b">${reserva.codigo}</td>
+                        <td class="px-4 py-2 border-b">${reserva.nombre}</td>
+                        <td class="px-4 py-2 border-b">${reserva.correo}</td>
+                        <td class="px-4 py-2 border-b">${new Date(reserva.fechaPago).toLocaleDateString()}</td>
+                        <td class="px-4 py-2 border-b">$${reserva.total} USD</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Función para buscar reservas por nombre o número de cupón
+        function buscarReservas() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filas = document.querySelectorAll('#reservasTableBody tr');
+            filas.forEach(fila => {
+                const celdas = fila.getElementsByTagName('td');
+                const numCupon = celdas[0].textContent.toLowerCase();
+                const cliente = celdas[1].textContent.toLowerCase();
+                if (numCupon.includes(searchTerm) || cliente.includes(searchTerm)) {
+                    fila.style.display = '';
+                } else {
+                    fila.style.display = 'none';
+                }
+            });
+        }
+
+        // Función para exportar las reservas a un archivo Excel
+        function exportarAExcel() {
+            const reservas = JSON.parse(localStorage.getItem('historialReservas')) || [];
+            const fechaLimite = new Date(new Date().setDate(new Date().getDate() - 15)); // 15 días atrás
+
+            // Filtrar las reservas que sean menores a 15 días
+            const reservasValidas = reservas.filter(reserva => {
+                const fechaPago = new Date(reserva.fechaPago);
+                return fechaPago >= fechaLimite;
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(reservasValidas.map(reserva => ({
+                'Número de Cupón': reserva.codigo,
+                'Cliente': reserva.nombre,
+                'Correo': reserva.correo,
+                'Fecha': new Date(reserva.fechaPago).toLocaleDateString(),
+                'Total': `$${reserva.total} USD`
+            })));
+            XLSX.utils.book_append_sheet(wb, ws, 'Reservas');
+            XLSX.writeFile(wb, 'reservas.xlsx');
+        }
+
+        // Función para ver los detalles de una reserva
+        function verDetallesReserva(codigo) {
+            const reservas = JSON.parse(localStorage.getItem('historialReservas')) || [];
+            const reserva = reservas.find(reserva => reserva.codigo === codigo);
+            if (reserva) {
+                alert(`
+                    Reserva: ${reserva.codigo}
+                    Cliente: ${reserva.nombre}
+                    Correo: ${reserva.correo}
+                    Fecha: ${new Date(reserva.fechaPago).toLocaleDateString()}
+                    Total: $${reserva.total} USD
+                `);
+            }
+        }
+
+        // Función para agregar una nueva reserva
+        function agregarReserva(reserva) {
+            const reservas = JSON.parse(localStorage.getItem('historialReservas')) || [];
+
+            // Limitar a un máximo de 50 reservas
+            if (reservas.length >= 50) {
+                reservas.shift(); // Elimina la reserva más antigua
+            }
+            reservas.push(reserva); // Agregar la nueva reserva
+            localStorage.setItem('historialReservas', JSON.stringify(reservas));
+            cargarReservas(); // Recargar las reservas en la tabla
+            exportarAExcel(); // Generar el archivo Excel
+        }
+
+        // Cargar las reservas cuando se carga la página
+        document.addEventListener('DOMContentLoaded', cargarReservas);
+    </script>
+</body>
+</html>
+
+
